@@ -1,4 +1,4 @@
-module github.com/ngicks/pkgmgr
+module github.com/ngicks/ngpkgmgr
 
 go 1.24.0
 
