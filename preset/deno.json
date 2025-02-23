@@ -1,0 +1,14 @@
+{
+    "ver": [
+        "deno",
+        "eval",
+        "console.log(Deno.version.deno)"
+    ],
+    "checklatest": [],
+    "install": [],
+    "update": [
+        "deno",
+        "upgrade",
+        "${VER}"
+    ]
+}
