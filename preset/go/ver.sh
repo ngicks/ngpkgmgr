@@ -1,4 +1,3 @@
 #!/bin/bash
-set -e
-set -o pipefail
+set -euo pipefail
 go version | awk '{print $3}' | sed 's/go//'

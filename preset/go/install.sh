@@ -1,8 +1,10 @@
 #!/bin/bash
-set -e
-set -o pipefail
+set -euo pipefail
 pushd /tmp
 curl -LO https://go.dev/dl/go${VER}.${OS}-${ARCH}.tar.gz
 sudo tar -C /usr/local -xzf go${VER}.${OS}-${ARCH}.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin/:$(/usr/local/go/bin/go env GOPATH)/bin' >> ~/home.sh
 popd
+# in case it is not created.
+mkdir ~/go -p
+cp $(dirname $0)/env.sh ~/go/
+echo '. ~/go/env.sh' >> ~/home.sh

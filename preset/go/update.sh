@@ -1,6 +1,5 @@
 #!/bin/bash
-set -e
-set -o pipefail
+set -euo pipefail
 pushd /tmp
 curl -LO https://go.dev/dl/go${VER}.${OS}-${ARCH}.tar.gz
 sudo rm -rf /usr/local/go
