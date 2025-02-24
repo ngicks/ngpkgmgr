@@ -309,7 +309,7 @@ func main() {
 						default:
 							return false
 						case err != nil,
-							fi.Mode().IsRegular() && strings.HasSuffix(fi.Name(), ".json"),
+							fi.Mode().IsRegular() && strings.HasSuffix(fi.Name(), ".json") && fi.Name() != pinnedVersionsFileName,
 							fi.IsDir():
 							return true
 						}
