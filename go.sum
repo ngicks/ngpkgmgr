@@ -4,5 +4,7 @@ github.com/ngicks/go-iterator-helper v0.0.18 h1:a9a3ndHDyYSsI9bLTV4LOUA9cg6NpwPy
 github.com/ngicks/go-iterator-helper v0.0.18/go.mod h1:g++KxWVGEkOnIhXVvpNNOdn7ON57aOpfu80ccBvPVHI=
 github.com/ngicks/und v1.0.0-alpha8 h1:hLy+UDaiBR19iLQN/TZr/vJJUQnv2MU+yKRulJ+bv3A=
 github.com/ngicks/und v1.0.0-alpha8/go.mod h1:Uqc/soYEzAZyTrAitb8Orox5TiIJ1hmha1SrwT8eICQ=
+golang.org/x/sync v0.11.0 h1:GGz8+XQP4FvTTrjZPzNKTMFtSXH80RAzG+5ghFPgK9w=
+golang.org/x/sync v0.11.0/go.mod h1:Czt+wKu1gCyEFDUtn0jG5QVvpJ6rzVqr5aXyt9drQfk=
 gotest.tools/v3 v3.5.1 h1:EENdUnS3pdur5nybKYIh2Vfgc8IUNBjxDPSjtiJcOzU=
 gotest.tools/v3 v3.5.1/go.mod h1:isy3WKz7GK6uNw/sbHzfKBLvlvXwUyV06n6brMxxopU=

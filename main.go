@@ -19,11 +19,13 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/ngicks/go-iterator-helper/hiter"
 	"github.com/ngicks/go-iterator-helper/hiter/ioiter"
 	"github.com/ngicks/go-iterator-helper/x/exp/xiter"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -357,6 +359,66 @@ func main() {
 		}
 	}
 
+	type targetedExecutor struct {
+		tgt      string
+		executor *commandExecutor
+	}
+	var updates []targetedExecutor
+	checkVersions := func() {
+		gr, gCtx := errgroup.WithContext(ctx)
+		gr.SetLimit(5)
+		var mu1, mu2 sync.Mutex
+		for executor := range iter() {
+			gr.Go(func() error {
+				out, err := executor.Exec(gCtx, commandVer, "", *v)
+				if err != nil || len(out) == 0 {
+					if err == nil {
+						err = fmt.Errorf("empty output")
+					}
+					err := fmt.Errorf("ver %q: %w", executor.commandSet.Name, err)
+					return err
+				}
+				mu1.Lock()
+				currentVersions[executor.commandSet.Name] = strings.TrimSpace(out)
+				mu1.Unlock()
+				return nil
+			})
+			gr.Go(func() error {
+				out, err := executor.Exec(gCtx, commandChecklatest, "", *v)
+				if err != nil || len(out) == 0 {
+					if err == nil {
+						err = fmt.Errorf("empty output")
+					}
+					err = fmt.Errorf("checklatest %q: %w", executor.commandSet.Name, err)
+					return err
+				}
+				mu2.Lock()
+				latestVersions[executor.commandSet.Name] = strings.TrimSpace(out)
+				mu2.Unlock()
+				return nil
+			})
+		}
+		err := gr.Wait()
+		if err != nil {
+			panic(err)
+		}
+
+		for executor := range iter() {
+			name := executor.commandSet.Name
+			tgt := cmp.Or(pinnedVersions[name], latestVersions[name])
+			fmt.Printf("%q: %s -> %s", name, currentVersions[name], tgt)
+			if pinnedVersions[name] != "" {
+				fmt.Printf("(pinned)")
+			}
+			if currentVersions[name] == tgt {
+				fmt.Printf(": no update\n")
+				continue
+			}
+			updates = append(updates, targetedExecutor{tgt: tgt, executor: executor})
+			fmt.Printf("\n")
+		}
+	}
+
 	switch command(cmd) {
 	case commandInstall:
 		for executor := range iter() {
@@ -399,58 +461,9 @@ func main() {
 		}
 		fmt.Printf("%s\n", must(json.MarshalIndent(currentVersions, "", "    ")))
 	case commandChecklatest:
-		for executor := range iter() {
-			out, err := executor.Exec(ctx, commandChecklatest, "", false)
-			if err != nil {
-				err := fmt.Errorf("checklatest %q: %w", executor.commandSet.Name, err)
-				if !*f {
-					panic(err)
-				}
-				fmt.Printf("warn: failed: %v\n", err)
-			}
-			latestVersions[executor.commandSet.Name] = strings.TrimSpace(out)
-		}
-		fmt.Printf("%s\n", must(json.MarshalIndent(latestVersions, "", "    ")))
+		checkVersions()
 	case commandUpdate:
-		for executor := range iter() {
-			func() {
-				out, err := executor.Exec(ctx, commandVer, "", *v)
-				if err != nil {
-					err := fmt.Errorf("ver %q: %w", executor.commandSet.Name, err)
-					panic(err)
-				}
-				currentVersions[executor.commandSet.Name] = strings.TrimSpace(out)
-			}()
-			func() {
-				out, err := executor.Exec(ctx, commandChecklatest, "", *v)
-				if err != nil {
-					err := fmt.Errorf("checklatest %q: %w", executor.commandSet.Name, err)
-					panic(err)
-				}
-				latestVersions[executor.commandSet.Name] = strings.TrimSpace(out)
-			}()
-		}
-
-		type targetedExecutor struct {
-			tgt      string
-			executor *commandExecutor
-		}
-		var updates []targetedExecutor
-		for executor := range iter() {
-			name := executor.commandSet.Name
-			tgt := cmp.Or(pinnedVersions[name], latestVersions[name])
-			fmt.Printf("%q: %s -> %s", name, currentVersions[name], tgt)
-			if pinnedVersions[name] != "" {
-				fmt.Printf("(pinned)")
-			}
-			if currentVersions[name] == tgt {
-				fmt.Printf(": no update\n")
-				continue
-			}
-			updates = append(updates, targetedExecutor{tgt: tgt, executor: executor})
-			fmt.Printf("\n")
-		}
-
+		checkVersions()
 		for _, t := range updates {
 			fmt.Printf("updating %q...\n\n", t.executor.commandSet.Name)
 			_, err := t.executor.Exec(ctx, commandUpdate, t.tgt, *v)
