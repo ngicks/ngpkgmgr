@@ -433,9 +433,9 @@ func main() {
 	switch command(cmd) {
 	case commandInstall:
 		for executor := range iter() {
-			fmt.Printf("installing %q...\n\n", executor.commandSet.Name)
+			fmt.Printf("installing %q...\n", executor.commandSet.Name)
 			out, err := executor.Exec(ctx, commandVer, "", false)
-			if err == nil {
+			if err == nil && len(out) > 0 {
 				fmt.Printf("Skipping %q: seems already installed at version %s\n", executor.commandSet.Name, strings.TrimSpace(out))
 				continue
 			}
@@ -444,7 +444,7 @@ func main() {
 			ver := strings.TrimSpace(out)
 			if err != nil {
 				ver = ""
-				fmt.Printf("\nfetching latest version failed with err %v\nNow trying with no version specified\n", err)
+				fmt.Printf("fetching latest version failed with err %v\nNow trying with no version specified\n", err)
 			}
 
 			_, err = executor.Exec(ctx, commandInstall, cmp.Or(pinnedVersions[executor.commandSet.Name], ver), *v)
@@ -455,13 +455,16 @@ func main() {
 				}
 				fmt.Printf("warn: failed: %v\n", err)
 			} else {
-				fmt.Printf("\n\ninstalling %q done!\n", executor.commandSet.Name)
+				fmt.Printf("installing %q done!\n", executor.commandSet.Name)
 			}
 		}
 	case commandVer:
 		for executor := range iter() {
 			out, err := executor.Exec(ctx, commandVer, "", false)
-			if err != nil {
+			if err != nil || len(out) == 0 {
+				if err == nil {
+					err = fmt.Errorf("empty output")
+				}
 				err := fmt.Errorf("ver %q: %w", executor.commandSet.Name, err)
 				if !*f {
 					panic(err)
@@ -476,12 +479,12 @@ func main() {
 	case commandUpdate:
 		checkVersions()
 		for _, t := range updates {
-			fmt.Printf("updating %q...\n\n", t.executor.commandSet.Name)
+			fmt.Printf("updating %q...\n", t.executor.commandSet.Name)
 			_, err := t.executor.Exec(ctx, commandUpdate, t.tgt, *v)
 			if err != nil {
 				panic(fmt.Errorf("updating %q: %w", t.executor.commandSet.Name, err))
 			}
-			fmt.Printf("\n\nupdated %q!\n", t.executor.commandSet.Name)
+			fmt.Printf("updated %q!\n", t.executor.commandSet.Name)
 		}
 	}
 }
