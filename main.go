@@ -46,6 +46,7 @@ type commandSet struct {
 	CheckLatest []string `json:"checklatest,omitzero"`
 	Install     []string `json:"install,omitzero"`
 	Update      []string `json:"update,omitzero"`
+	After       []string `json:"after,omitzero"`
 }
 
 type command string
@@ -184,6 +185,7 @@ func main() {
 				Install:     []string{},
 				CheckLatest: []string{},
 				Update:      []string{},
+				After:       []string{},
 			})
 			_ = f.Close()
 			if err != nil {
@@ -344,6 +346,7 @@ func main() {
 		)
 		// may contain both .json and directory
 		sets = slices.CompactFunc(sets, func(i, j namedCommandSet) bool { return i.Name == j.Name })
+		sets = topologicalSort(sets)
 	}
 
 	if *debug {
@@ -488,4 +491,46 @@ func must[V any](v V, err error) V {
 		panic(err)
 	}
 	return v
+}
+
+func topologicalSort(s []namedCommandSet) []namedCommandSet {
+	type node struct {
+		after []*node
+		val   namedCommandSet
+	}
+
+	nodes := make([]*node, len(s))
+	for i, e := range s {
+		nodes[i] = &node{val: e}
+	}
+	for i, n := range nodes {
+		for j, nn := range nodes {
+			if i == j {
+				continue
+			}
+			if slices.Contains(n.val.Set.After, nn.val.Name) {
+				n.after = append(n.after, nn)
+			}
+		}
+	}
+
+	sorted := make([]namedCommandSet, 0, len(s))
+
+	visited := make(map[*node]bool, len(s))
+	var visit func(n *node, visited map[*node]bool)
+	visit = func(n *node, visited map[*node]bool) {
+		if visited[n] {
+			return
+		}
+		visited[n] = true
+		for _, nn := range n.after {
+			visit(nn, visited)
+		}
+		sorted = append(sorted, n.val)
+	}
+	for _, n := range nodes {
+		visit(n, visited)
+	}
+
+	return sorted
 }
