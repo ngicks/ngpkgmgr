@@ -164,7 +164,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("getting os.UserConfigDir: %w", err))
 		}
-		cfgDir = filepath.Join(userCfgDir, "ngicks-pkgmgr")
+		cfgDir = filepath.Join(userCfgDir, "ngpkgmgr")
 	}
 
 	if *n != "" {
