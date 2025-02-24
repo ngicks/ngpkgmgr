@@ -29,10 +29,11 @@ import (
 )
 
 var (
-	dir = flag.String("dir", "", "")
-	v   = flag.Bool("v", false, "")
-	f   = flag.Bool("f", false, "force option: ignores errors")
-	n   = flag.String("new", "", "creates command sets for given name")
+	dir   = flag.String("dir", "", "")
+	v     = flag.Bool("v", false, "")
+	f     = flag.Bool("f", false, "force option: ignores errors")
+	n     = flag.String("new", "", "creates command sets for given name")
+	debug = flag.Bool("debug", false, "debug")
 )
 
 type namedCommandSet struct {
@@ -343,6 +344,13 @@ func main() {
 		)
 		// may contain both .json and directory
 		sets = slices.CompactFunc(sets, func(i, j namedCommandSet) bool { return i.Name == j.Name })
+	}
+
+	if *debug {
+		for _, s := range sets {
+			fmt.Printf("name = %s, after = %v\n", s.Name, s.Set.After)
+		}
+		return
 	}
 
 	currentVersions := map[string]string{}
