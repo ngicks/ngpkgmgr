@@ -1,6 +1,6 @@
 #!/bin/bash
 
-gobin=/usr/local/go/bin/go
+gobin=~/.local/go/bin/go
 
 export PATH=$($gobin env GOROOT)/bin:$PATH
 
