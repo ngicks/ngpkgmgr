@@ -135,7 +135,9 @@ func (e commandExecutor) Exec(
 	cmd.Stdin = e.stdin
 
 	buf := new(bytes.Buffer)
-	if !verbose {
+	if kind == commandInstall {
+		cmd.Stdout = e.stdout
+	} else if !verbose {
 		cmd.Stdout = buf
 	} else {
 		cmd.Stdout = io.MultiWriter(buf, e.stdout)
