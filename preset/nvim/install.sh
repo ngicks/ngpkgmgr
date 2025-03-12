@@ -7,4 +7,4 @@ tar -xzf nvim-linux-x86_64.tar.gz
 rm -rf ~/nvim
 mv ./nvim-linux-x86_64 ~/nvim
 popd
-echo 'export PATH="$PATH:~/nvim/bin"' >> ~/home.sh
+echo 'export PATH="$PATH:$HOME/nvim/bin"' >> ~/home.sh
