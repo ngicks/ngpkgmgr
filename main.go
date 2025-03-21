@@ -155,7 +155,13 @@ func (e commandExecutor) Exec(
 
 const (
 	pinnedVersionsFileName = ".pin.json"
+  installFileName        = ".install.json" 
 )
+
+var ignoredFiles = []string{
+  pinnedVersionsFileName,
+  installFileName,
+}
 
 func main() {
 	flag.Parse()
@@ -316,7 +322,7 @@ func main() {
 						default:
 							return false
 						case err != nil,
-							fi.Mode().IsRegular() && strings.HasSuffix(fi.Name(), ".json") && fi.Name() != pinnedVersionsFileName,
+							fi.Mode().IsRegular() && strings.HasSuffix(fi.Name(), ".json") && !slices.Contains(ignoredFiles, fi.Name()),
 							fi.IsDir():
 							return true
 						}
