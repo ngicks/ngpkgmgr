@@ -12,6 +12,7 @@ A simple meta package manager which just stores shell commands for install / upd
 
 ```
 sudo apt update && sudo apt install -y p7zip-full jq dasel
-mkdir -p ~/bin
+mkdir ~/bin
 cp ./prebuilt/linux-amd64/* ~/bin/
 ```
+

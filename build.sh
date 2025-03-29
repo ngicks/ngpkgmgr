@@ -1,7 +1,23 @@
 #!/bin/bash
 set -euo pipefail
-mkdir -p ./prebuilt/$(go env GOOS)-$(go env GOARCH)/
-go build -o ./prebuilt/$(go env GOOS)-$(go env GOARCH)/ .
-for p in ./cmd/*; do
-    go build -o ./prebuilt/$(go env GOOS)-$(go env GOARCH)/ $p
+
+oss=(
+  "linux"
+  "darwin"
+  "windows"
+)
+
+archs=(
+  "amd64"
+  "arm64"
+)
+
+for os in "${oss[@]}" ; do
+  for arch in "${archs[@]}" ; do
+    mkdir -p ./prebuilt/${os}-${arch}/
+    go build -o ./prebuilt/${os}-${arch}/ .
+    for p in ./cmd/*; do
+      go build -o ./prebuilt/${os}-${arch}/ $p
+    done
+  done
 done

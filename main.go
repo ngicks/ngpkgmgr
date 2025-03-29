@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"iter"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -25,12 +26,13 @@ import (
 	"github.com/ngicks/go-iterator-helper/hiter"
 	"github.com/ngicks/go-iterator-helper/hiter/ioiter"
 	"github.com/ngicks/go-iterator-helper/x/exp/xiter"
+	"github.com/ngicks/und/option"
 	"golang.org/x/sync/errgroup"
 )
 
 var (
-	dir   = flag.String("dir", "", "")
-	v     = flag.Bool("v", false, "")
+	dir   = flag.String("dir", "", "specifies dir for pkg command sets")
+	v     = flag.Bool("v", false, "verbose output")
 	f     = flag.Bool("f", false, "force option: ignores errors")
 	n     = flag.String("new", "", "creates command sets for given name")
 	debug = flag.Bool("debug", false, "debug")
@@ -39,6 +41,7 @@ var (
 type namedCommandSet struct {
 	Name string
 	Set  commandSet
+	Base option.Option[commandSet]
 }
 
 type commandSet struct {
@@ -99,33 +102,52 @@ func newCommandExecutor(
 	}
 }
 
+var errCommandNotFound = errors.New("command not found")
+
+func (e commandExecutor) pickArgs(kind command) ([]string, error) {
+	args, err := pickArgs(e.commandSet.Name, e.commandSet.Set, kind, e.dir)
+	if err == nil || !errors.Is(err, errCommandNotFound) {
+		return args, err
+	}
+	if e.commandSet.Base.IsNone() {
+		return nil, err
+	}
+	return pickArgs(e.commandSet.Name, e.commandSet.Base.Value(), kind, e.dir)
+}
+
+func pickArgs(name string, set commandSet, kind command, dir string) ([]string, error) {
+	args := set.Select(kind)
+	if len(args) > 0 {
+		return args, nil
+	}
+	for _, suf := range []string{"", ".sh", ".exe", ".bat", ".ps1"} {
+		name := filepath.Join(dir, url.PathEscape(name), string(kind)+suf)
+		_, err := os.Stat(name)
+		if err == nil {
+			return []string{name}, nil
+		}
+	}
+	return nil, errCommandNotFound
+}
+
 func (e commandExecutor) Exec(
 	ctx context.Context,
 	kind command,
 	ver string,
 	verbose bool,
 ) (string, error) {
-	args := e.commandSet.Set.Select(kind)
-	if len(args) > 0 {
-		dict := dictReplacer{
-			"${VER}":  ver,
-			"${OS}":   runtime.GOOS,
-			"${ARCH}": runtime.GOARCH,
-		}
-		args = slices.Collect(dict.Map(slices.Values(args)))
-	} else {
-		for _, suf := range []string{"", ".sh", ".exe", ".bat", ".ps1"} {
-			name := filepath.Join(e.dir, e.commandSet.Name, string(kind)+suf)
-			_, err := os.Stat(name)
-			if err == nil {
-				args = append(slices.Clip(args), name)
-				break
-			}
-		}
-		if len(args) == 0 {
-			return "", fmt.Errorf("command not found")
-		}
+	args, err := e.pickArgs(kind)
+	if err != nil {
+		return "", err
 	}
+
+	dict := dictReplacer{
+		"${VER}":     ver,
+		"${PKGNAME}": e.commandSet.Name,
+		"${OS}":      runtime.GOOS,
+		"${ARCH}":    runtime.GOARCH,
+	}
+	args = slices.Collect(dict.Map(slices.Values(args)))
 
 	cmd := exec.CommandContext(ctx, args[0])
 	if len(args) > 1 {
@@ -144,23 +166,33 @@ func (e commandExecutor) Exec(
 	}
 	cmd.Stderr = e.stderr
 
-	cmd.Env = append(os.Environ(), "OS="+runtime.GOOS, "ARCH="+runtime.GOARCH)
+	cmd.Env = append(
+		os.Environ(),
+		"OS="+runtime.GOOS,
+		"ARCH="+runtime.GOARCH,
+		"PKGNAME="+"'"+e.commandSet.Name+"'",
+	)
 	if ver != "" {
 		cmd.Env = append(cmd.Env, "VER="+ver)
 	}
 
-	err := cmd.Run()
+	err = cmd.Run()
 	return buf.String(), err
 }
 
 const (
-	pinnedVersionsFileName = ".pin.json"
-  installFileName        = ".install.json" 
+	pinnedVersionsFileName = ".pin.json"  // pinning for pkgs
+	baseFilename           = ".base.json" // base command sets. replaces each commands unless non empty
+	baseDirname            = ".base"
 )
 
 var ignoredFiles = []string{
-  pinnedVersionsFileName,
-  installFileName,
+	pinnedVersionsFileName,
+	baseFilename,
+}
+
+var ignoredDirs = []string{
+	baseDirname,
 }
 
 func main() {
@@ -180,7 +212,8 @@ func main() {
 	}
 
 	if *n != "" {
-		f, err := os.OpenFile(filepath.Join(cfgDir, *n+".json"), os.O_RDWR|os.O_CREATE|os.O_EXCL, fs.ModePerm)
+		name := url.PathEscape(*n)
+		f, err := os.OpenFile(filepath.Join(cfgDir, name+".json"), os.O_RDWR|os.O_CREATE|os.O_EXCL, fs.ModePerm)
 		switch {
 		default:
 			panic(err)
@@ -200,12 +233,12 @@ func main() {
 				panic(err)
 			}
 		}
-		err = os.Mkdir(filepath.Join(cfgDir, *n), fs.ModePerm)
+		err = os.Mkdir(filepath.Join(cfgDir, name), fs.ModePerm)
 		if err != nil && !errors.Is(err, fs.ErrExist) {
 			panic(err)
 		}
 		for _, c := range cmds {
-			scriptName := filepath.Join(cfgDir, *n, string(c))
+			scriptName := filepath.Join(cfgDir, name, string(c))
 			switch runtime.GOOS {
 			case "windows":
 				scriptName += ".ps1"
@@ -257,6 +290,21 @@ func main() {
 		}
 	}
 
+	var baseCommands option.Option[commandSet]
+	if _, err := os.Stat(filepath.Join(cfgDir, baseFilename)); err == nil {
+		f, err := os.Open(filepath.Join(cfgDir, baseFilename))
+		if err != nil {
+			panic(err)
+		}
+		var cmdSet commandSet
+		err = json.NewDecoder(f).Decode(&cmdSet)
+		_ = f.Close()
+		if err != nil {
+			panic(err)
+		}
+		baseCommands = option.Some(cmdSet)
+	}
+
 	for k, v := range pinnedVersions {
 		if k != strings.TrimSpace(k) || v != strings.TrimSpace(v) {
 			panic(fmt.Errorf("pinned version %q has space prefix and/or suffix in name or version", k))
@@ -265,7 +313,7 @@ func main() {
 
 	var sets []namedCommandSet
 	if tgt != "" {
-		f, err := os.Open(filepath.Join(cfgDir, tgt+".json"))
+		f, err := os.Open(filepath.Join(cfgDir, url.PathEscape(tgt)+".json"))
 		if err == nil {
 			var set commandSet
 			err = json.NewDecoder(f).Decode(&set)
@@ -273,18 +321,18 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			sets = append(sets, namedCommandSet{Name: tgt, Set: set})
+			sets = append(sets, namedCommandSet{Name: tgt, Set: set, Base: baseCommands})
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			panic(err)
 		} else {
-			s, err := os.Stat(filepath.Join(cfgDir, tgt))
+			s, err := os.Stat(filepath.Join(cfgDir, url.PathEscape(tgt)))
 			if err != nil {
 				panic(err)
 			}
 			if !s.IsDir() {
 				panic(fmt.Errorf("file %[1]q.json or directory %[1]q must exist", tgt))
 			}
-			sets = append(sets, namedCommandSet{Name: tgt})
+			sets = append(sets, namedCommandSet{Name: tgt, Base: baseCommands})
 		}
 	} else {
 		dir, err := os.Open(cfgDir)
@@ -296,6 +344,10 @@ func main() {
 			sets[:0],
 			xiter.Map2(
 				func(fi fs.FileInfo, err error) (namedCommandSet, error) {
+					name, unescapeErr := url.PathUnescape(strings.TrimSuffix(fi.Name(), ".json"))
+					if unescapeErr != nil {
+						name = fi.Name()
+					}
 					switch {
 					default:
 						return namedCommandSet{}, err
@@ -310,10 +362,10 @@ func main() {
 						if err != nil {
 							return namedCommandSet{}, err
 						}
-						return namedCommandSet{Name: strings.TrimSuffix(fi.Name(), ".json"), Set: set}, nil
+						return namedCommandSet{Name: name, Set: set, Base: baseCommands}, nil
 					case fi.IsDir():
 						// directory should contain scripts.
-						return namedCommandSet{Name: fi.Name()}, nil
+						return namedCommandSet{Name: name, Base: baseCommands}, nil
 					}
 				},
 				xiter.Filter2(
@@ -323,7 +375,7 @@ func main() {
 							return false
 						case err != nil,
 							fi.Mode().IsRegular() && strings.HasSuffix(fi.Name(), ".json") && !slices.Contains(ignoredFiles, fi.Name()),
-							fi.IsDir():
+							fi.IsDir() && !slices.Contains(ignoredDirs, fi.Name()):
 							return true
 						}
 					},
