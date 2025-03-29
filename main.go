@@ -141,11 +141,15 @@ func (e commandExecutor) Exec(
 		return "", err
 	}
 
+	profileSh := option.FromOk(os.LookupEnv("PROFILE_SH")).Or(option.Some("~/.config/env/path.sh")).Value()
+	_ = os.MkdirAll(filepath.Dir(profileSh), fs.ModePerm) // in case dir does not exists.
 	dict := dictReplacer{
 		"${VER}":     ver,
 		"${PKGNAME}": e.commandSet.Name,
 		"${OS}":      runtime.GOOS,
 		"${ARCH}":    runtime.GOARCH,
+		// location of start up profile. often echo >> 'export PATH..." >> ${PROFILE_SH} will be performed in install command.
+		"${PROFILE_SH}": profileSh,
 	}
 	args = slices.Collect(dict.Map(slices.Values(args)))
 
@@ -170,7 +174,8 @@ func (e commandExecutor) Exec(
 		os.Environ(),
 		"OS="+runtime.GOOS,
 		"ARCH="+runtime.GOARCH,
-		"PKGNAME="+"'"+e.commandSet.Name+"'",
+		"PKGNAME='"+e.commandSet.Name+"'", // TODO: call shell escape?
+		"PROFILE_SH='"+profileSh+"'",
 	)
 	if ver != "" {
 		cmd.Env = append(cmd.Env, "VER="+ver)
