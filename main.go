@@ -141,7 +141,14 @@ func (e commandExecutor) Exec(
 		return "", err
 	}
 
-	profileSh := option.FromOk(os.LookupEnv("PROFILE_SH")).Or(option.Some("~/.config/env/path.sh")).Value()
+	profileSh := os.Getenv("PROFILE_SH")
+	if profileSh == "" {
+		dir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("os.UserHomeDir: %w", err)
+		}
+		profileSh = filepath.Join(dir, "/.config/env/path.sh")
+	}
 	_ = os.MkdirAll(filepath.Dir(profileSh), fs.ModePerm) // in case dir does not exists.
 	dict := dictReplacer{
 		"${VER}":     ver,
@@ -174,8 +181,8 @@ func (e commandExecutor) Exec(
 		os.Environ(),
 		"OS="+runtime.GOOS,
 		"ARCH="+runtime.GOARCH,
-		"PKGNAME='"+e.commandSet.Name+"'", // TODO: call shell escape?
-		"PROFILE_SH='"+profileSh+"'",
+		"PKGNAME="+e.commandSet.Name, // TODO: call shell escape?
+		"PROFILE_SH="+profileSh,
 	)
 	if ver != "" {
 		cmd.Env = append(cmd.Env, "VER="+ver)
