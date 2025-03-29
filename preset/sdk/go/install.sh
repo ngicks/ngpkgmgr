@@ -7,4 +7,5 @@ popd
 # in case it is not created.
 mkdir ~/go -p
 cp $(dirname $0)/env.sh ~/go/
+chmod +x ~/go/env.sh
 echo '. $HOME/go/env.sh' >> ${PROFILE_SH}
