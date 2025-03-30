@@ -147,7 +147,7 @@ func (e commandExecutor) Exec(
 		if err != nil {
 			return "", fmt.Errorf("os.UserHomeDir: %w", err)
 		}
-		profileSh = filepath.Join(dir, "/.config/env/path.sh")
+		profileSh = filepath.Join(dir, "/.config/env/00_path.sh")
 	}
 	_ = os.MkdirAll(filepath.Dir(profileSh), fs.ModePerm) // in case dir does not exists.
 	dict := newDictReplacer(
