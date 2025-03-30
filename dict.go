@@ -2,16 +2,15 @@ package main
 
 import (
 	"iter"
-
-	"github.com/ngicks/und/option"
+	"strings"
 )
 
-type dictReplacer map[string]string
+type dictReplacer strings.Replacer
 
-func (r dictReplacer) Map(seq iter.Seq[string]) iter.Seq[string] {
+func (r *dictReplacer) Map(seq iter.Seq[string]) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for s := range seq {
-			if !yield(option.GetMap(r, s).Or(option.Some(s)).Value()) {
+			if !yield((*strings.Replacer)(r).Replace(s)) {
 				return
 			}
 		}
