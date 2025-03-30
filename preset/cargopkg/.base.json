@@ -1,0 +1,7 @@
+{
+  "ver": ["gobuildinfo", "-main", "${PKGNAME}"],
+  "checklatest": ["querygoproxy", "-only-latest", "${PKGNAME}"],
+  "install": ["cargo", "install", "${PKGNAME}"],
+  "update": ["cargo", "install", "${PKGNAME}@${VER}"],
+  "after": []
+}
