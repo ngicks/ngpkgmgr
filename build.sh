@@ -17,7 +17,7 @@ for os in "${oss[@]}" ; do
     mkdir -p ./prebuilt/${os}-${arch}/
     go build -o ./prebuilt/${os}-${arch}/ .
     for p in ./cmd/*; do
-      go build -o ./prebuilt/${os}-${arch}/ $p
+      go build -trimpath -o ./prebuilt/${os}-${arch}/ $p
     done
   done
 done
