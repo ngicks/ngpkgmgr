@@ -9,14 +9,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ngicks/go-common/exver"
 	"github.com/ngicks/go-iterator-helper/hiter"
 	"github.com/ngicks/go-iterator-helper/hiter/stringsiter"
-	"github.com/ngicks/go-iterator-helper/x/exp/xiter"
-	"github.com/ngicks/ngpkgmgr/internal/version"
 )
 
 var (
 	onlyLatest = flag.Bool("only-latest", false, "prints only latest version")
+	excludePre = flag.Bool("exclude-pre", false, "if set, excludes pre-release version")
 )
 
 func must[V any](v V, err error) V {
@@ -26,9 +26,7 @@ func must[V any](v V, err error) V {
 	return v
 }
 
-var (
-	proxyGolangOrgUrl = must(url.Parse("https://proxy.golang.org"))
-)
+var proxyGolangOrgUrl = must(url.Parse("https://proxy.golang.org"))
 
 func main() {
 	flag.Parse()
@@ -58,17 +56,21 @@ func main() {
 		panic(err)
 	}
 	versions, err := hiter.TryCollect(
-		hiter.Divide(
-			func(s string) (version.Version, error) {
-				return version.Parse(strings.TrimPrefix(s, "v"))
-			},
-			stringsiter.SplitFunc(string(bin), -1, nil),
+		hiter.Filter2(func(ver exver.Version, err error) bool {
+			return !(*excludePre) || ver.PreRelease() == ""
+		},
+			hiter.Divide(
+				func(s string) (exver.Version, error) {
+					return exver.Parse(strings.TrimPrefix(s, "v"))
+				},
+				stringsiter.SplitFunc(string(bin), -1, nil),
+			),
 		),
 	)
 	if err != nil {
 		panic(err)
 	}
-	slices.SortFunc(versions, func(i, j version.Version) int { return -i.Compare(j) })
+	slices.SortFunc(versions, func(i, j exver.Version) int { return -i.Compare(j) })
 	if *onlyLatest && len(versions) > 0 {
 		fmt.Println(versions[0].String())
 		return
@@ -76,5 +78,5 @@ func main() {
 	// concat then print at once.
 	// If this command is piped to command line `head -n 1`,
 	// the downstream existing early may cause "signal: broken pipe".
-	fmt.Println(stringsiter.Join("\n", xiter.Map(version.Version.String, slices.Values(versions))))
+	fmt.Println(stringsiter.Join("\n", hiter.Map(exver.Version.String, slices.Values(versions))))
 }
