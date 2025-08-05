@@ -25,7 +25,7 @@ import (
 
 	"github.com/ngicks/go-iterator-helper/hiter"
 	"github.com/ngicks/go-iterator-helper/hiter/ioiter"
-	"github.com/ngicks/go-iterator-helper/x/exp/xiter"
+	"github.com/ngicks/go-iterator-helper/hiter/mapper"
 	"github.com/ngicks/und/option"
 	"golang.org/x/sync/errgroup"
 )
@@ -150,7 +150,7 @@ func (e commandExecutor) Exec(
 		profileSh = filepath.Join(dir, "/.config/env/00_path.sh")
 	}
 	_ = os.MkdirAll(filepath.Dir(profileSh), fs.ModePerm) // in case dir does not exists.
-	dict := newDictReplacer(
+	dict := mapper.NewStringsReplacer(
 		"${VER}", ver,
 		"${PKGNAME}", e.commandSet.Name,
 		"${OS}", runtime.GOOS,
@@ -354,7 +354,7 @@ func main() {
 
 		sets, err = hiter.TryAppendSeq(
 			sets[:0],
-			xiter.Map2(
+			hiter.Map2(
 				func(fi fs.FileInfo, err error) (namedCommandSet, error) {
 					name, unescapeErr := url.PathUnescape(strings.TrimSuffix(fi.Name(), ".json"))
 					if unescapeErr != nil {
@@ -380,7 +380,7 @@ func main() {
 						return namedCommandSet{Name: name, Base: baseCommands}, nil
 					}
 				},
-				xiter.Filter2(
+				hiter.Filter2(
 					func(fi fs.FileInfo, err error) bool {
 						switch {
 						default:
