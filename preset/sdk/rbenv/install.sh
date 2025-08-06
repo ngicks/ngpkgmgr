@@ -40,4 +40,6 @@ fi
 mkdir -p ~/.local/rbenv/cache
 
 echo 'export RBENV_ROOT=$HOME/.local/rbenv' >> ${PROFILE_SH}
-echo 'eval "$($HOME/.local/rbenv/bin/rbenv init - --no-rehash bash)"' >> ${PROFILE_SH}
+
+echo "shell_base=\$(basename \$SHELL)" >> ${PROFILE_SH}
+echo 'eval "$($HOME/.local/rbenv/bin/rbenv init - --no-rehash $shell_base)"' >> ${PROFILE_SH}
